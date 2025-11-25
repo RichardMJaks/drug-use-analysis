@@ -304,6 +304,27 @@ COLUMNS_CORRESPONDENCE_DICTIONARIES = {
     "Impulsive": IMPULSIVENESS,
     "SS": SENSATION,
 }
+DRUG_TYPES = [
+    "Alcohol",
+    "Amphet",
+    "Amyl",
+    "Benzos",
+    "Caff",
+    "Cannabis",
+    "Choc",
+    "Coke",
+    "Crack",
+    "Ecstasy",
+    "Heroin",
+    "Ketamine",
+    "Legalh",
+    "LSD",
+    "Meth",
+    "Mushrooms",
+    "Nicotine",
+    "Semer",
+    "VSA",
+]
 
 def read_data(filepath: str):
     """
@@ -330,8 +351,8 @@ def convert_data(data: pd.DataFrame):
     return data
 
 
-def convert_drug_usage_classifiers(data: pd.DataFrame, drug_types):
-    for drug in drug_types:
+def convert_drug_usage_classifiers(data: pd.DataFrame):
+    for drug in DRUG_TYPES:
         data[drug] = _convert_series(data[drug], DRUG_CLASSIFIER)
 
     return data
