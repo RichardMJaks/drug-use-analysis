@@ -39,3 +39,4 @@ human_readable_data = data_reading.convert_drug_usage_classifiers(data)
 human_readable_data
 
 # %%
+pn.gpplot(data, pn.aes("LSD")) + pn.geom_bar()
