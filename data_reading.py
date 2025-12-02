@@ -340,18 +340,20 @@ def convert_data(data: pd.DataFrame):
     """
     Converts data into a human-readable format
     """
+    data = data.copy()
 
     valid_columns = COLUMNS_CORRESPONDENCE_DICTIONARIES.keys()
     for column in data.columns:
         if not column in valid_columns:
             continue
 
-        data[column] = _convert_series(data[column], COLUMNS_CORRESPONDENCE_DICTIONARIES[column])
+        data[column] = data[column].replace(COLUMNS_CORRESPONDENCE_DICTIONARIES[column]) # _convert_series(data[column].astype(float), COLUMNS_CORRESPONDENCE_DICTIONARIES[column])
 
     return data
 
 
 def convert_drug_usage_classifiers(data: pd.DataFrame):
+    data = data.copy()
     for drug in DRUG_TYPES:
         data[drug] = _convert_series(data[drug], DRUG_CLASSIFIER)
 
@@ -359,4 +361,5 @@ def convert_drug_usage_classifiers(data: pd.DataFrame):
 
 
 def _convert_series(series: pd.Series, correspondence_dict: dict):
+    series = series.copy()
     return series.map(lambda x: correspondence_dict[x])
