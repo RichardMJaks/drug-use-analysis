@@ -326,6 +326,15 @@ DRUG_TYPES = [
     "VSA",
 ]
 
+PERSONALITY_TRAITS = [
+	"Nscore",
+	"Ascore",
+	"Oscore",
+	"Escore",
+	"Cscore",
+	"Impulsive",
+	"SS",
+]
 def read_data(filepath: str):
     """
     Reads and cleans data from the specified path
