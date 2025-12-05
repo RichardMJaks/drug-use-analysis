@@ -1,4 +1,5 @@
 import pandas as pd
+import data_reading
 
 #region CORE METHODS
 def get_columns_unique_value_counts(data: pd.DataFrame):
@@ -57,6 +58,30 @@ def describe_data(data: pd.DataFrame):
     print(nan_counts)
     
     print(SEPARATOR_STRING)
+
+def get_drug_usage_by_trait(data: pd.DataFrame, drug: str, trait: str):
+    output_data = data[[trait, drug]]
+    output_data = output_data.groupby([trait, drug]).size().reset_index(name="Amount")
+
+    return output_data
+
+
+def get_all_drug_usage_by_trait(data: pd.DataFrame, trait: str):
+    output_data = data[data_reading.DRUG_TYPES + [trait]]
+
+    grouped_usage = pd.DataFrame(columns=[trait, "Drug", "Classifier", "Users"])
+    for drug_type in data_reading.DRUG_TYPES:
+        single_drug_grouping = output_data[[trait, drug_type]]
+        single_drug_grouping = single_drug_grouping.groupby([trait, drug_type]).size().reset_index(name="Users")
+        single_drug_grouping = single_drug_grouping.rename(columns={drug_type: "Classifier"})
+        single_drug_grouping["Drug"] = drug_type
+
+        grouped_usage = pd.concat(
+            (grouped_usage, single_drug_grouping)
+        )
+
+    return grouped_usage
+	
 #endregion
 
 
