@@ -1211,7 +1211,8 @@ drug_per_education["Education"] = pd.Categorical(
         categories=list(data_reading.EDUCATION.values()),
         ordered=True,
     )
-drug_per_education
+drug_per_education_total = drug_per_education.copy()
+drug_per_education_total
 
 # %%
 (
@@ -1275,5 +1276,8 @@ drug_per_education = drug_per_education[~drug_per_education["Classifier"].isin([
     + pn.theme(
         figure_size=(12, 12),
         axis_text_x=pn.element_text(rotation=90, hjust=1),
+        axis_text_y=pn.element_blank()
     )
 )
+
+# %%
