@@ -252,6 +252,10 @@ plot_trait_by_drug(grouped_usage, "Nscore")
 # If we take chocolate and caffeine as a baseline, because almost all people eat chocolate and have tried coffe (excluding alcohol) then we see that maybe more neurotic people do illegal drugs. Let's now do a confidence test for this.
 
 # %%
+"""Takes each wide drug column (Alcohol, Amphet, …, VSA) and stacks them into a single column called "Drug".
+The corresponding cell values (e.g. "Never Used", "Used in Last Week") go into a column called "Classifier"."""
+
+#  1) melt drugs to long
 data2 = dataOG.copy()
 data2 = data_reading.convert_drug_usage_classifiers(data2)  # map CL0..CL6 → 'Never Used', etc.
 data2 = data_reading.convert_data(data2)
@@ -264,7 +268,7 @@ long_drugs = data2.melt(
     value_name="Classifier",
 )
 
-
+#The same but for traits
 
 # 2) melt traits to long
 trait_long = long_drugs.melt(
@@ -1313,6 +1317,11 @@ drug_per_education = drug_per_education[drug_per_education["Classifier"] != "Nev
 
 # %%
 drug_per_education = drug_per_education[~drug_per_education["Classifier"].isin(["Used in Last Year", "Used over a Decade Ago", "Used in Last Decade"])]
+drug_per_education["Classifier"] = pd.Categorical(
+        drug_per_education["Classifier"],
+        categories=list(data_reading.DRUG_CLASSIFIER.values()),
+        ordered=True,
+    )
 (
     pn.ggplot(drug_per_education, pn.aes("Education", "Relative", fill="Classifier")) 
     + pn.geom_col()
@@ -1336,6 +1345,11 @@ drug_per_gender = drug_per_gender[~drug_per_gender["Classifier"].isin(
      "Used over a Decade Ago", 
      "Used in Last Decade"]
 )]
+drug_per_gender["Classifier"] = pd.Categorical(
+        drug_per_gender["Classifier"],
+        categories=list(data_reading.DRUG_CLASSIFIER.values()),
+        ordered=True,
+    )
 drug_per_gender
 
 # %%
@@ -1362,11 +1376,16 @@ drug_per_age = drug_per_age[~drug_per_age["Classifier"].isin(
      "Used over a Decade Ago", 
      "Used in Last Decade"]
 )]
+drug_per_age["Classifier"] = pd.Categorical(
+        drug_per_age["Classifier"],
+        categories=list(data_reading.DRUG_CLASSIFIER.values()),
+        ordered=True,
+    )
 drug_per_age
 
 # %%
 (
-    pn.ggplot(drug_per_gender, pn.aes("Gender", "Relative", fill="Classifier")) 
+    pn.ggplot(drug_per_age, pn.aes("Age", "Relative", fill="Classifier")) 
     + pn.geom_col(position="dodge")
     + pn.facet_wrap("Drug")
     + pn.theme(
