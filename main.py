@@ -97,6 +97,9 @@ drug_users
 
 # %%
 countries = human_readable_data.groupby("Country")["Country"].size().rename("Count").reset_index()
+ethnicities = human_readable_data["Ethnicity"].reset_index()
+ethnicities = ethnicities.groupby("Ethnicity").size().reset_index(name="Amount")
+ethnicities
 
 
 # %%
@@ -112,6 +115,44 @@ countries = human_readable_data.groupby("Country")["Country"].size().rename("Cou
 # %%
 human_readable_data = human_readable_data[human_readable_data["Country"].isin(["USA", "UK"])]
 data = data[data["Country"].isin([0.96082, -0.57009])]
+human_readable_data
+
+# %%
+ethnicities = human_readable_data["Ethnicity"].reset_index()
+ethnicities = ethnicities.groupby("Ethnicity").size().reset_index(name="Amount")
+ethnicities
+
+# %% [markdown]
+# Filter out everyone who is not white, due to lack of datapoints and out of consideration of ethnic differences
+
+# %%
+human_readable_data = human_readable_data[human_readable_data["Ethnicity"] == "White"]
+data = data[data["Ethnicity"] == -0.31685]
+human_readable_data
+
+# %%
+ages = human_readable_data["Age"].reset_index()
+ages = ages.groupby("Age").size().reset_index(name="Amount")
+ages
+
+# %% [markdown]
+# Filter out everyone who is 65+ due to lack of datapoints
+
+# %%
+human_readable_data = human_readable_data[human_readable_data["Age"] != "65+"]
+data = data[data["Age"] != 2.59171]
+human_readable_data
+
+# %%
+edu_levels = human_readable_data["Education"].reset_index().groupby("Education").size().reset_index(name="Amount")
+edu_levels
+
+# %% [markdown]
+# Filter out everyone who left the school before 16 and at 17 years due to lack of datapoints
+
+# %%
+human_readable_data = human_readable_data[~human_readable_data["Education"].isin(["Left School Before 16 years", "Left School at 17 years"])]
+data = data[~data["Education"].isin([-2.43591, -1.43719])]
 human_readable_data
 
 # %% [markdown]
@@ -1222,6 +1263,7 @@ drug_per_education_total
     + pn.theme(
         figure_size=(12, 12),
         axis_text_x=pn.element_text(rotation=90, hjust=1),
+        axis_text_y=pn.element_blank(),
     )
 )
 
@@ -1246,6 +1288,7 @@ drug_per_education
     + pn.theme(
         figure_size=(12, 12),
         axis_text_x=pn.element_text(rotation=90, hjust=1),
+        axis_text_y=pn.element_blank(),
     )
 )
 
@@ -1261,6 +1304,7 @@ drug_per_education = drug_per_education[drug_per_education["Classifier"] != "Nev
     + pn.theme(
         figure_size=(12, 12),
         axis_text_x=pn.element_text(rotation=90, hjust=1),
+        axis_text_y=pn.element_blank(),
     )
 )
 
@@ -1280,4 +1324,54 @@ drug_per_education = drug_per_education[~drug_per_education["Classifier"].isin([
     )
 )
 
+# %% [markdown]
+# Samamoodi ka soo põhiselt
+
 # %%
+drug_per_gender = data_analysis.get_all_drug_usage_by_trait(human_readable_data, "Gender")
+drug_per_gender["Relative"] = drug_per_gender["Users"] / drug_per_gender.groupby(["Gender", "Drug"], observed=True).transform("sum")["Users"]
+drug_per_gender = drug_per_gender[~drug_per_gender["Classifier"].isin(
+    ["Never Used", 
+     "Used in Last Year", 
+     "Used over a Decade Ago", 
+     "Used in Last Decade"]
+)]
+drug_per_gender
+
+# %%
+(
+    pn.ggplot(drug_per_gender, pn.aes("Gender", "Relative", fill="Classifier")) 
+    + pn.geom_col(position="dodge")
+    + pn.facet_wrap("Drug")
+    + pn.theme(
+        figure_size=(12, 6),
+        axis_text_x=pn.element_text(rotation=90, hjust=1),
+        axis_text_y=pn.element_blank(),
+    )
+)
+
+# %% [markdown]
+# Drug usage per age
+
+# %%
+drug_per_age = data_analysis.get_all_drug_usage_by_trait(human_readable_data, "Age")
+drug_per_age["Relative"] = drug_per_age["Users"] / drug_per_age.groupby(["Age", "Drug"], observed=True).transform("sum")["Users"]
+drug_per_age = drug_per_age[~drug_per_age["Classifier"].isin(
+    ["Never Used", 
+     "Used in Last Year", 
+     "Used over a Decade Ago", 
+     "Used in Last Decade"]
+)]
+drug_per_age
+
+# %%
+(
+    pn.ggplot(drug_per_gender, pn.aes("Gender", "Relative", fill="Classifier")) 
+    + pn.geom_col(position="dodge")
+    + pn.facet_wrap("Drug")
+    + pn.theme(
+        figure_size=(12, 6),
+        axis_text_x=pn.element_text(rotation=90, hjust=1),
+        axis_text_y=pn.element_blank(),
+    )
+)
