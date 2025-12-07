@@ -213,6 +213,19 @@ grouped_usage
     + pn.theme(figure_size=(25, 25))
 )
 
+# %%
+(
+    pn.ggplot(drug_usage, pn.aes(x="Drug", y="Amount", fill="Usage"))
+    + pn.geom_col(
+        position=pn.position_dodge(width=0.8),
+        width=0.7,                              
+    )
+    + pn.theme(
+        figure_size=(14, 6),
+        axis_text_x=pn.element_text(rotation=90, ha="right"),
+    )
+)
+
 
 # %%
 def plot_trait_by_drug(grouped_usage, trait):
@@ -1393,4 +1406,158 @@ drug_per_age
         axis_text_x=pn.element_text(rotation=90, hjust=1),
         axis_text_y=pn.element_blank(),
     )
+)
+
+# %%
+personality_drugs = human_readable_data[data_reading.DRUG_TYPES + data_reading.PERSONALITY_TRAITS]
+melted_drugs = personality_drugs.melt(
+    id_vars=data_reading.DRUG_TYPES,
+    value_vars=data_reading.PERSONALITY_TRAITS,
+    var_name="Trait",
+    value_name="Score",
+)
+def get_personality_drug_melt(data: pd.DataFrame):
+    grouped_usage = pd.DataFrame(columns=["Drug", "Trait", "Classifier", "Score"])
+    for drug_type in data_reading.DRUG_TYPES:
+        single_drug_grouping = data[data[drug_type] != "Never Used"][["Trait", drug_type, "Score"]]
+        single_drug_grouping = single_drug_grouping.rename(columns={drug_type: "Classifier"})
+        single_drug_grouping["Drug"] = drug_type
+        #print(single_drug_grouping)
+
+        grouped_usage = pd.concat(
+            (grouped_usage, single_drug_grouping)
+        )
+
+    return grouped_usage
+
+melted_drugs = get_personality_drug_melt(melted_drugs)
+
+
+
+melted_drugs["Classifier"] = "Drug"
+
+mean_scores = melted_drugs.groupby(["Drug", "Trait", "Classifier", ]).mean().reset_index()
+
+# Insert overall means for each trait
+for trait in data_reading.PERSONALITY_TRAITS:
+    trait_overall_mean = melted_drugs[melted_drugs["Trait"] == trait]["Score"].mean()
+    mean_scores.loc[-1] = ["Overall mean", trait, "Overall mean", trait_overall_mean]
+    mean_scores.index = mean_scores.index + 1
+    mean_scores = mean_scores.sort_index()
+
+# Rename stuff for ease of understanding
+mean_scores = mean_scores.rename(columns={"Classifier": "Type"})
+
+mean_scores
+
+# %%
+ascores = mean_scores[mean_scores["Trait"] == "Ascore"]
+cscores = mean_scores[mean_scores["Trait"] == "Cscore"]
+escores = mean_scores[mean_scores["Trait"] == "Escore"]
+impulsive = mean_scores[mean_scores["Trait"] == "Impulsive"]
+nscores = mean_scores[mean_scores["Trait"] == "Nscore"]
+oscores = mean_scores[mean_scores["Trait"] == "Oscore"]
+ss = mean_scores[mean_scores["Trait"] == "SS"]
+
+# %%
+(
+    pn.ggplot(escores, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
+    + pn.geom_col()
+    + pn.theme(
+        figure_size=(12, 6),
+        axis_text_x=pn.element_text(rotation=30, hjust=1),
+        axis_text_y=pn.element_blank(),
+        legend_position="none",
+    )
+    + pn.coord_cartesian(ylim=(37,43.5))
+    + pn.labs(x="", y="Extraversion", title="Extraversion by Drug")
+)
+
+# %%
+(
+    pn.ggplot(ascores, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
+    + pn.geom_col()
+    + pn.theme(
+        figure_size=(12, 6),
+        axis_text_x=pn.element_text(rotation=30, hjust=1),
+        axis_text_y=pn.element_blank(),
+        legend_position="none",
+    )
+    + pn.coord_cartesian(ylim=(37,43.5))
+    + pn.labs(x="", y="Agreeableness", title="Agreeableness by Drug")
+
+)
+
+# %%
+(
+    pn.ggplot(cscores, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
+    + pn.geom_col()
+    + pn.theme(
+        figure_size=(12, 6),
+        axis_text_x=pn.element_text(rotation=30, hjust=1),
+        axis_text_y=pn.element_blank(),
+        legend_position="none",
+    )
+    + pn.coord_cartesian(ylim=(37,43.5))
+    + pn.labs(x="", y="Conscientiousness", title="Conscientiousness by Drug")
+
+)
+
+# %%
+(
+    pn.ggplot(nscores, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
+    + pn.geom_col()
+    + pn.theme(
+        figure_size=(12, 6),
+        axis_text_x=pn.element_text(rotation=30, hjust=1),
+        axis_text_y=pn.element_blank(),
+        legend_position="none",
+    )
+    + pn.coord_cartesian(ylim=(35,43.5))
+    + pn.labs(x="", y="Neuroticism", title="Neuroticism by Drug")
+
+)
+
+# %%
+(
+    pn.ggplot(oscores, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
+    + pn.geom_col()
+    + pn.theme(
+        figure_size=(12, 6),
+        axis_text_x=pn.element_text(rotation=30, hjust=1),
+        axis_text_y=pn.element_blank(),
+        legend_position="none",
+    )
+    + pn.coord_cartesian(ylim=(42,50))
+    + pn.labs(x="", y="Openness", title="Openness by Drug")
+
+)
+
+# %%
+(
+    pn.ggplot(impulsive, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
+    + pn.geom_col()
+    + pn.theme(
+        figure_size=(12, 6),
+        axis_text_x=pn.element_text(rotation=30, hjust=1),
+        axis_text_y=pn.element_blank(),
+        legend_position="none",
+    )
+    + pn.coord_cartesian(ylim=(0, 10))
+    + pn.labs(x="", y="Impulsiveness", title="Impulsiveness by Drug")
+
+)
+
+# %%
+(
+    pn.ggplot(ss, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
+    + pn.geom_col()
+    + pn.theme(
+        figure_size=(12, 6),
+        axis_text_x=pn.element_text(rotation=30, hjust=1),
+        axis_text_y=pn.element_blank(),
+        legend_position="none",
+    )
+    + pn.coord_cartesian(ylim=(0,10))
+    + pn.labs(x="", y="Sensation", title="Sensation (measured by ImpSS) by Drug")
 )
