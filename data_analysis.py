@@ -72,7 +72,7 @@ def get_all_drug_usage_by_trait(data: pd.DataFrame, trait: str):
     grouped_usage = pd.DataFrame(columns=[trait, "Drug", "Classifier", "Users"])
     for drug_type in data_reading.DRUG_TYPES:
         single_drug_grouping = output_data[[trait, drug_type]]
-        single_drug_grouping = single_drug_grouping.groupby([trait, drug_type]).size().reset_index(name="Users")
+        single_drug_grouping = single_drug_grouping.groupby([trait, drug_type], observed=True).size().reset_index(name="Users")
         single_drug_grouping = single_drug_grouping.rename(columns={drug_type: "Classifier"})
         single_drug_grouping["Drug"] = drug_type
 
