@@ -166,6 +166,59 @@ data = data.drop("Semer", axis=1)
 data_reading.DRUG_TYPES.remove("Semer")
 
 
+# %%
+# Make new plots again, with reliable data
+# Bring data to a shape possible to be shown as a plot
+drug_usage = data_analysis.get_columns_unique_value_counts(human_readable_data[data_reading.DRUG_TYPES])
+drug_usage = drug_usage.transpose().reset_index(names="Drug")
+drug_usage = drug_usage.melt(id_vars="Drug", var_name="Usage", value_name="Amount")
+
+# Replace NaN amounts with 0-s
+drug_usage = drug_usage.fillna(0)
+
+drug_usage
+
+# %%
+#Adding one row for crack with used in last day to not be 0 (does not make data less acurate, but makes it a lot more visually appealing
+drug_usage_forPlot = drug_usage.copy()
+new_row = {
+    "Drug": "Crack",
+    "Usage": "Used in Last Day",
+    "Amount": 1.0,   # change this number if needed
+}
+
+drug_usage_forPlot = pd.concat([drug_usage_forPlot, pd.DataFrame([new_row])], ignore_index=True)
+
+drug_usage_forPlot[drug_usage_forPlot["Drug"] == "Crack"]
+
+# %%
+df = drug_usage.copy()
+
+# total per drug
+df["Total"] = df.groupby("Drug")["Amount"].transform("sum")
+
+# convert to percent
+df["Percent"] = df["Amount"] / df["Total"] * 100
+
+#df = drug_usage[drug_usage["Amount"] > 0].copy()
+df = df[df["Percent"] >= 1].copy()
+
+# %%
+(
+    pn.ggplot(df, pn.aes("Drug", "Percent", fill="Usage"))
+    + pn.geom_col(position=pn.position_dodge(width=0.8), width=0.7)
+    + pn.scale_y_log10()
+    + pn.labs(
+        x="Total percentage of users by usage count (values >1%)",
+        y="Percent (log scale)"
+    )
+    + pn.theme(
+        figure_size=(14, 6),
+        axis_text_x=pn.element_text(rotation=90, ha="right"),
+    )
+)
+
+
 # %% [markdown]
 # Get drug usage and personality trait dataframe
 
@@ -1408,6 +1461,9 @@ drug_per_age
     )
 )
 
+# %% [markdown]
+# Get mean personality scores for each drug, and confidence indicators
+
 # %%
 personality_drugs = human_readable_data[data_reading.DRUG_TYPES + data_reading.PERSONALITY_TRAITS]
 melted_drugs = personality_drugs.melt(
@@ -1419,7 +1475,7 @@ melted_drugs = personality_drugs.melt(
 def get_personality_drug_melt(data: pd.DataFrame):
     grouped_usage = pd.DataFrame(columns=["Drug", "Trait", "Classifier", "Score"])
     for drug_type in data_reading.DRUG_TYPES:
-        single_drug_grouping = data[data[drug_type] != "Never Used"][["Trait", drug_type, "Score"]]
+        single_drug_grouping = data[["Trait", drug_type, "Score"]]
         single_drug_grouping = single_drug_grouping.rename(columns={drug_type: "Classifier"})
         single_drug_grouping["Drug"] = drug_type
         #print(single_drug_grouping)
@@ -1432,23 +1488,107 @@ def get_personality_drug_melt(data: pd.DataFrame):
 
 melted_drugs = get_personality_drug_melt(melted_drugs)
 
+# Exclude non-users of the drugs for calculations
+mean_scores = melted_drugs[melted_drugs["Classifier"] != "Never Used"]
+mean_scores["Classifier"] = "" # Will later be overwritten to compare to overall mean
 
 
-melted_drugs["Classifier"] = "Drug"
+agg = (
+        mean_scores.drop(columns=["Classifier"]).groupby(["Drug", "Trait"], as_index=False)
+        .agg(
+            Mean=("Score", "mean"),
+            SD=("Score", "std"),
+            N=("Score", "size"),
+        )
+    )
 
-mean_scores = melted_drugs.groupby(["Drug", "Trait", "Classifier", ]).mean().reset_index()
 
-# Insert overall means for each trait
-for trait in data_reading.PERSONALITY_TRAITS:
-    trait_overall_mean = melted_drugs[melted_drugs["Trait"] == trait]["Score"].mean()
-    mean_scores.loc[-1] = ["Overall mean", trait, "Overall mean", trait_overall_mean]
-    mean_scores.index = mean_scores.index + 1
-    mean_scores = mean_scores.sort_index()
+# standard error
+agg["SE"] = agg["SD"] / np.sqrt(agg["N"])
+
+# 95% CI using normal approximation (z = 1.96)
+z = 1.96
+agg["CI_low"] = agg["Mean"] - z * agg["SE"]
+agg["CI_high"] = agg["Mean"] + z * agg["SE"]
+
+mean_scores = mean_scores.groupby(["Drug", "Trait", "Classifier"]).mean().reset_index()
+
+mean_scores = mean_scores.merge(
+    agg,
+    on=["Drug", "Trait"]
+)
 
 # Rename stuff for ease of understanding
 mean_scores = mean_scores.rename(columns={"Classifier": "Type"})
 
 mean_scores
+
+# %% [markdown]
+# Get overall mean values and confidence indicators from all respondents
+
+# %%
+# Insert overall means for each trait
+for trait in data_reading.PERSONALITY_TRAITS:
+    trait_overall_mean = melted_drugs[melted_drugs["Trait"] == trait]["Score"].mean()
+    overall_agg = melted_drugs[melted_drugs["Trait"] == trait]["Score"].agg(
+            Mean="mean",
+            SD="std",
+            N="size",
+        )
+    
+    # standard error
+    overall_agg["SE"] = overall_agg["SD"] / np.sqrt(overall_agg["N"])
+
+    # 95% CI using normal approximation (z = 1.96)
+    z = 1.96
+    overall_agg["CI_low"] = overall_agg["Mean"] - z * overall_agg["SE"]
+    overall_agg["CI_high"] = overall_agg["Mean"] + z * overall_agg["SE"]
+    mean_scores.loc[-1] = [
+        "Overall mean", trait, "Overall mean", trait_overall_mean, 
+        overall_agg["Mean"],
+        overall_agg["SD"],
+        overall_agg["N"],
+        overall_agg["SE"],
+        overall_agg["CI_low"],
+        overall_agg["CI_high"],
+    ]
+    mean_scores.index = mean_scores.index + 1
+    mean_scores = mean_scores.sort_index()
+
+mean_scores
+
+# %% [markdown]
+# Get significant differences from overall mean
+
+# %%
+for trait in data_reading.PERSONALITY_TRAITS:
+    mask = mean_scores["Trait"] == trait
+    overall = mean_scores[(mean_scores.loc[mask, "Drug"] == "Overall mean") & mask]
+    overall_mean = overall["Mean"].iloc[0]
+    if trait == "Escore":
+        print(overall_mean)
+    overall_ci_high = overall["CI_high"].iloc[0]
+    overall_ci_low = overall["CI_low"].iloc[0]
+
+    mean_scores.loc[mask, "MeanSignificantlyHigherThanOverallMean"] = mean_scores.loc[mask, "CI_low"] > overall_ci_high
+    mean_scores.loc[mask, "MeanSignificantlyLowerThanOverallMean"] = mean_scores.loc[mask, "CI_high"] < overall_ci_low
+
+    mean_scores.loc[mask, "MeanDifferenceFromOverallMean"] = (
+        (mean_scores.loc[mask, "Mean"] - overall_mean).abs()
+    )
+
+    mean_scores.loc[mask, "Type"] = np.where(
+        mean_scores.loc[mask, "Drug"] == "Overall mean",
+        "Overall mean", 
+        np.where(
+            mean_scores.loc[mask, "MeanSignificantlyLowerThanOverallMean"] | mean_scores.loc[mask, "MeanSignificantlyHigherThanOverallMean"],
+            "Significant Difference",
+            "Within Bounds"
+        )
+    )
+    
+
+mean_scores[mean_scores["Trait"] == "Escore"]
 
 # %%
 ascores = mean_scores[mean_scores["Trait"] == "Ascore"]
@@ -1459,105 +1599,50 @@ nscores = mean_scores[mean_scores["Trait"] == "Nscore"]
 oscores = mean_scores[mean_scores["Trait"] == "Oscore"]
 ss = mean_scores[mean_scores["Trait"] == "SS"]
 
-# %%
-(
-    pn.ggplot(escores, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
-    + pn.geom_col()
-    + pn.theme(
-        figure_size=(12, 6),
-        axis_text_x=pn.element_text(rotation=30, hjust=1),
-        axis_text_y=pn.element_blank(),
-        legend_position="none",
-    )
-    + pn.coord_cartesian(ylim=(37,43.5))
-    + pn.labs(x="", y="Extraversion", title="Extraversion by Drug")
-)
+type_colors = {
+    "Significant Difference": "#cc3300",  # red
+    "Within Bounds": "#88cc00",           # green
+    "Overall mean": "#00cccc"             # blue
+}
 
-# %%
-(
-    pn.ggplot(ascores, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
-    + pn.geom_col()
-    + pn.theme(
-        figure_size=(12, 6),
-        axis_text_x=pn.element_text(rotation=30, hjust=1),
-        axis_text_y=pn.element_blank(),
-        legend_position="none",
+def pn_config(data, trait, ylim=(37,43.5)):
+    return (
+        pn.ggplot(data, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
+        + pn.geom_col()
+        + pn.theme(
+            figure_size=(12, 6),
+            axis_text_x=pn.element_text(rotation=30, hjust=1),
+            axis_text_y=pn.element_blank(),
+            legend_position="none",
+            
+        )
+        + pn.coord_cartesian(ylim=ylim)
+        + pn.labs(x="", y=trait, title=f"{trait} by Drug")
+        + pn.geom_errorbar(
+            pn.aes(ymin="CI_low", ymax="CI_high"),
+            width=0.2
+        )
+        + pn.scale_fill_manual(values=type_colors)
     )
-    + pn.coord_cartesian(ylim=(37,43.5))
-    + pn.labs(x="", y="Agreeableness", title="Agreeableness by Drug")
 
-)
 
 # %%
-(
-    pn.ggplot(cscores, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
-    + pn.geom_col()
-    + pn.theme(
-        figure_size=(12, 6),
-        axis_text_x=pn.element_text(rotation=30, hjust=1),
-        axis_text_y=pn.element_blank(),
-        legend_position="none",
-    )
-    + pn.coord_cartesian(ylim=(37,43.5))
-    + pn.labs(x="", y="Conscientiousness", title="Conscientiousness by Drug")
-
-)
+pn_config(escores, "Extraversion")
 
 # %%
-(
-    pn.ggplot(nscores, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
-    + pn.geom_col()
-    + pn.theme(
-        figure_size=(12, 6),
-        axis_text_x=pn.element_text(rotation=30, hjust=1),
-        axis_text_y=pn.element_blank(),
-        legend_position="none",
-    )
-    + pn.coord_cartesian(ylim=(35,43.5))
-    + pn.labs(x="", y="Neuroticism", title="Neuroticism by Drug")
-
-)
+pn_config(ascores, "Agreeableness")
 
 # %%
-(
-    pn.ggplot(oscores, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
-    + pn.geom_col()
-    + pn.theme(
-        figure_size=(12, 6),
-        axis_text_x=pn.element_text(rotation=30, hjust=1),
-        axis_text_y=pn.element_blank(),
-        legend_position="none",
-    )
-    + pn.coord_cartesian(ylim=(42,50))
-    + pn.labs(x="", y="Openness", title="Openness by Drug")
-
-)
+pn_config(cscores, "Conscientiousness")
 
 # %%
-(
-    pn.ggplot(impulsive, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
-    + pn.geom_col()
-    + pn.theme(
-        figure_size=(12, 6),
-        axis_text_x=pn.element_text(rotation=30, hjust=1),
-        axis_text_y=pn.element_blank(),
-        legend_position="none",
-    )
-    + pn.coord_cartesian(ylim=(0, 10))
-    + pn.labs(x="", y="Impulsiveness", title="Impulsiveness by Drug")
-
-)
+pn_config(nscores, "Neuroticism", (30, 45))
 
 # %%
-(
-    pn.ggplot(ss, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
-    + pn.geom_col()
-    + pn.theme(
-        figure_size=(12, 6),
-        axis_text_x=pn.element_text(rotation=30, hjust=1),
-        axis_text_y=pn.element_blank(),
-        legend_position="none",
-    )
-    + pn.coord_cartesian(ylim=(0,10))
-    + pn.labs(x="", y="Sensation", title="Sensation (measured by ImpSS) by Drug")
-)
+pn_config(oscores, "Openness", (40, 50))
+
+# %%
+pn_config(impulsive, "Impulsiveness", (0, 10))
+
+# %%
+pn_config(ss, "Sensation", (0, 10))
