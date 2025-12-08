@@ -315,6 +315,7 @@ data_analysis.plot_edu_levels_country(data2)
 
 # %%
 drug_per_education = data_analysis.get_all_drug_usage_by_trait(human_readable_data, "Education")
+drug_per_education["Users"] = drug_per_education["Users"].astype(int)
 #drug_per_education = drug_per_education[drug_per_education["Classifier"] != "Never Used"]
 drug_per_education["Education"] = pd.Categorical(
         drug_per_education["Education"],
@@ -322,43 +323,57 @@ drug_per_education["Education"] = pd.Categorical(
         ordered=True,
     )
 drug_per_education_total = drug_per_education.copy()
-drug_per_education_total
+drug_per_education["Education"].dtype
 
 # %%
-(
+print(drug_per_education["Education"].dtype)
+p = (
     pn.ggplot(drug_per_education, pn.aes("Education", "Users", fill="Classifier")) 
     + pn.geom_col(position="dodge")
     + pn.facet_wrap("Drug")
     + pn.theme(
         figure_size=(12, 12),
-        axis_text_x=pn.element_text(rotation=90, hjust=1),
+        axis_text_x=pn.element_text(rotation=-30, hjust=0),
         axis_text_y=pn.element_blank(),
+        axis_ticks_major_y=pn.element_blank(),
+        plot_title=pn.element_text(size=20)
+
     )
+    + pn.labs(title="Drug Usage by Education")
 )
+p.save("plots/drug_usage_by_education.svg")
+p.show()
 
 # %% [markdown]
 # Taking into account the previously visualized amount of respondents per education level, the lower absolute number of users in lower education categories makes sense. Thus, those need to be visualized proportionally to respondents per education level. We will also drop ex-users (users, who haven't use the respective drugs for over a month) from the visualization, due to them mostly just cluttering it and making the visualization harder to read.
 
 # %%
-drug_per_education["Relative"] = drug_per_education["Users"] / drug_per_education.groupby(["Education", "Drug"], observed=True).transform("sum")["Users"]
-
-# %%
-drug_per_education = drug_per_education[~drug_per_education["Classifier"].isin(["Never Used", "Used in Last Year", "Used over a Decade Ago", "Used in Last Decade"])]
+drug_per_education["Relative"] = (drug_per_education["Users"] / drug_per_education.groupby(["Education", "Drug"], observed=True).transform("sum")["Users"]).astype(float)
+drug_per_education = drug_per_education[~drug_per_education["Classifier"].isin(["Never Used"])]
 drug_per_education["Classifier"] = pd.Categorical(
         drug_per_education["Classifier"],
-        categories=list(data_reading.DRUG_CLASSIFIER.values()),
+        categories=list(data_reading.DRUG_CLASSIFIER.values())[1:], # Remove categories not present in this
         ordered=True,
     )
-(
+drug_per_education["Relative"].dtype
+
+# %%
+p = (
     pn.ggplot(drug_per_education, pn.aes("Education", "Relative", fill="Classifier")) 
     + pn.geom_col()
-    + pn.facet_wrap("Drug")
+    + pn.facet_wrap("Drug", nrow=3)
+    + pn.labs(x="", y="", title="Drugs Users by Education (% Usage per Education Level)")
     + pn.theme(
-        figure_size=(12, 12),
-        axis_text_x=pn.element_text(rotation=90, hjust=1),
-        axis_text_y=pn.element_blank()
+        figure_size=(12, 6),
+        axis_text_x=pn.element_text(rotation=-30, hjust=0),
+        axis_text_y=pn.element_blank(),
+        axis_ticks_major_y=pn.element_blank(),
+        strip_text_x=pn.element_text(size=16),
+        plot_title=pn.element_text(size=20),
     )
 )
+p.save("plots/drugs_vs_education.svg")
+p.show()
 
 # %% [markdown]
 # As expected, **dropping out at college level increases drug usage rates** across the board. Similarly expected result is when dropping out at 18 years old. We expected that dropping out at younger ages would also increase the rates, but those seem to be consistent with gaining higher education.
@@ -481,69 +496,93 @@ ss = mean_scores[mean_scores["Trait"] == "SS"]
 
 type_colors = {
     "Significant Difference": "#cc3300",  # red
-    "Within Bounds": "#88cc00",           # green
+    "Within Bounds": "#59b300",           # green
     "Overall mean": "#00cccc"             # blue
 }
 
 def pn_config(data, trait, ylim=(37,43.5)):
     return (
-        pn.ggplot(data, pn.aes("reorder(Drug, Score)", "Score", fill="Type")) 
+        pn.ggplot(data, pn.aes("reorder(Drug, Score)", "Score", fill="Type", label="Score")) 
         + pn.geom_col()
         + pn.theme(
-            figure_size=(12, 6),
-            axis_text_x=pn.element_text(rotation=30, hjust=1),
+            figure_size=(12, 4),
+            axis_text_x=pn.element_text(rotation=30, hjust=1, size=12),
             axis_text_y=pn.element_blank(),
+            axis_ticks_y=pn.element_blank(),
             legend_position="none",
+            plot_title=pn.element_text(size=20),
+            axis_title_y = pn.element_text(size=16)
             
         )
         + pn.coord_cartesian(ylim=ylim)
-        + pn.labs(x="", y=trait, title=f"{trait} by Drug")
+        + pn.labs(x="", y="", title=f"{trait} by Drug")
         + pn.geom_errorbar(
             pn.aes(ymin="CI_low", ymax="CI_high"),
             width=0.2
         )
+        + pn.geom_text(
+            pn.aes(label="round(Score, 2)", color="Type"),
+            size=10,
+            va="bottom",
+            #fontweight="bold",
+        )
         + pn.scale_fill_manual(values=type_colors)
+        + pn.scale_color_manual(values=type_colors)
     )
 
 
 # %%
-pn_config(escores, "Extraversion")
+p = pn_config(escores, "Extraversion")
+p.save("plots/personality/extraversion.svg")
+p.show()
 
 # %% [markdown]
 # Here we can confidently say, that extraversion doesn't get impacted too much by given drugs based on this dataset. We see that **Heroin, Meth, VSA and Benzos** are barely outside of the overall mean, with large errors. Based on current observations, we could say it is significant enough, but low confidence indicators also show, that it might not be the case.
 
 # %%
-pn_config(ascores, "Agreeableness")
+p = pn_config(ascores, "Agreeableness")
+p.save("plots/personality/agreeableness.svg")
+p.show()
 
 # %% [markdown]
 # We can easily observe here, that **Agreeableness is heavily impacted by drugs**. Most drugs reduce it, and harder drugs, especially **Heroin, Methamphetamines, and Cocaine** reduce agreeableness by a lot.
 
 # %%
-pn_config(cscores, "Conscientiousness")
+p = pn_config(cscores, "Conscientiousness") + pn.theme(legend_position=(0, 1))
+p.save("plots/personality/conscientiousness.svg")
+p.show()
 
 # %% [markdown]
 # What goes for Agreeableness, goes doubly for Conscientiousness. **Conscientiousness** is very heavily impacted by various drugs, making the users less structured and less organized overall.
 
 # %%
-pn_config(nscores, "Neuroticism", (30, 45))
+p = pn_config(nscores, "Neuroticism", (30, 45))
+p.save("plots/personality/neuroticism.svg")
+p.show()
 
 # %% [markdown]
 # **Neuroticism** isn't as heavily impacted as some other traits, but it is nonetheless clearly visible, that drug-users become more neurotic, and thus less emotionally stable than non-users. 
 
 # %%
-pn_config(oscores, "Openness", (40, 50))
+p = pn_config(oscores, "Openness", (40, 50))
+p.save("plots/personality/openness.svg")
+p.show()
 
 # %% [markdown]
 # Also, as expected, **drug-users have higher Openness scores** than regular users. They tend to see and imagine things due to doing drugs. They also tend to be more open and sociable.
 
 # %%
-pn_config(impulsive, "Impulsiveness", (0, 10))
+p = pn_config(impulsive, "Impulsiveness", (0, 10))
+p.save("plots/personality/impulsiveness.svg")
+p.show()
 
 # %% [markdown]
 # Another change we could expect was **drug-users becoming more impulsive**. They tend to do more rash decisions, and think less in the bigger picture.
 
 # %%
-pn_config(ss, "Sensation (as measured by ImpSS)", (0, 10))
+p = pn_config(ss, "Sensation (as measured by ImpSS)", (0, 10))
+p.save("plots/personality/sensation.svg")
+p.show()
 
 # %% [markdown]
 # **Drug users also tend to become more sensory**, receiving more information through their senses than non-users. 
@@ -619,6 +658,7 @@ ax = sns.heatmap(
 )
 plt.title("Drug co-usage heatmap")
 plt.tight_layout()
+plt.savefig("plots/heatmap.svg")
 plt.show()
 
 # %% [markdown]

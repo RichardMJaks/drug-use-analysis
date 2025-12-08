@@ -1,5 +1,6 @@
 import pandas as pd
 
+#region Constants
 AGE = {
     -0.95197: "18-24",
     -0.07854: "25-34",
@@ -334,7 +335,7 @@ PERSONALITY_TRAITS = [
 	"Impulsive",
 	"SS",
 ]
-
+#endregion
 
 def read_data(filepath: str):
     """
@@ -363,6 +364,9 @@ def convert_data(data: pd.DataFrame):
 
 
 def convert_drug_usage_classifiers(data: pd.DataFrame):
+    """
+    Maps correct classifiers to human-readable format
+    """
     data = data.copy()
     for drug in DRUG_TYPES:
         data[drug] = _convert_series(data[drug], DRUG_CLASSIFIER)
