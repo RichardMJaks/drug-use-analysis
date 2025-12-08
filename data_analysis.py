@@ -32,7 +32,7 @@ def get_columns_na_counts(data: pd.DataFrame):
     """
     data.apply(_count_na)
 
-
+# Unusued method, initially used for describing data
 def describe_data(data: pd.DataFrame):
     print("DATA DESCRIPTION")
 
@@ -65,6 +65,10 @@ def describe_data(data: pd.DataFrame):
 
 
 def get_drug_usage_by_trait(data: pd.DataFrame, drug: str, trait: str):
+    """
+    Takes in a drug and a trait. Returns dataframe, where drug usage
+    numbers have been counted per each drug usage classifier for the given trait
+    """
     output_data = data[[trait, drug]]
     output_data = output_data.groupby([trait, drug]).size().reset_index(name="Amount")
 
@@ -72,9 +76,15 @@ def get_drug_usage_by_trait(data: pd.DataFrame, drug: str, trait: str):
 
 
 def get_all_drug_usage_by_trait(data: pd.DataFrame, trait: str):
+    """
+    Same as get_drug_usage_by_trait, but gets the data about all the drugs.
+    Melts them into a DataFrame with columns "[Trait Name], Drug, Classifier and Users"
+    """
     output_data = data[data_reading.DRUG_TYPES + [trait]]
 
     grouped_usage = pd.DataFrame(columns=[trait, "Drug", "Classifier", "Users"])
+
+    # Manual melt due to the abundance of columns
     for drug_type in data_reading.DRUG_TYPES:
         single_drug_grouping = output_data[[trait, drug_type]]
         single_drug_grouping = single_drug_grouping.groupby([trait, drug_type], observed=True).size().reset_index(name="Users")
@@ -89,6 +99,10 @@ def get_all_drug_usage_by_trait(data: pd.DataFrame, trait: str):
 
 
 def get_uk_and_us_cannabis_users(data: pd.DataFrame):
+    """
+    Gets proportional number of cannabis users for USA and UK
+    Calculated with respect to the country
+    """ 
     cannabis_users_by_country = data.groupby(["Country", "Cannabis"]).size().reset_index(name="Amount")
     # Get all users
     users_amount_by_country = (
@@ -123,6 +137,10 @@ def get_uk_and_us_cannabis_users(data: pd.DataFrame):
 
 
 def get_personality_drug_melt(data: pd.DataFrame):
+    """
+    Takes in a pre-melted DataFrame, melts drug columns under "Drug" and "Classifier" columns
+    for each drug.
+    """
     grouped_usage = pd.DataFrame(columns=["Drug", "Trait", "Classifier", "Score"])
     for drug_type in data_reading.DRUG_TYPES:
         single_drug_grouping = data[["Trait", drug_type, "Score"]]
@@ -138,6 +156,10 @@ def get_personality_drug_melt(data: pd.DataFrame):
 
 
 def calculate_mean_personality_scores_per_drug(melted_data: pd.DataFrame):
+    """
+    Calculates personality indicator means for each drug.
+    Also calculates CI values for each of them
+    """
     mean_scores = melted_data
     mean_scores["Classifier"] = "" # Will later be overwritten to compare to overall mean
 
@@ -172,6 +194,10 @@ def calculate_mean_personality_scores_per_drug(melted_data: pd.DataFrame):
 
 
 def calculate_overall_personality_means(melted_data: pd.DataFrame, mean_scores: pd.DataFrame):
+    """
+    Calculates mean personality from all of the valid respondents, including non-users.
+    Also creates respective entries for each Trait for overall mean values, alongside CI scores
+    """
     melted_drugs = melted_data
     for trait in data_reading.PERSONALITY_TRAITS:
         trait_overall_mean = melted_drugs[melted_drugs["Trait"] == trait]["Score"].mean()
@@ -204,20 +230,30 @@ def calculate_overall_personality_means(melted_data: pd.DataFrame, mean_scores: 
 
 
 def calculate_significant_difference_from_overall(mean_scores: pd.DataFrame):
+    """
+    Compares overall mean's low and high CI against each other mean's low and high CI's
+    Adds 2 columns to indicate mean's difference significance from overall
+    replaces type's with the mean's significance
+    """
     for trait in data_reading.PERSONALITY_TRAITS:
         mask = mean_scores["Trait"] == trait
+
+        # Get Overall mean values into variables
         overall = mean_scores[(mean_scores.loc[mask, "Drug"] == "Overall mean") & mask]
         overall_mean = overall["Mean"].iloc[0]
         overall_ci_high = overall["CI_high"].iloc[0]
         overall_ci_low = overall["CI_low"].iloc[0]
 
+        # Compare if there is significant difference
         mean_scores.loc[mask, "MeanSignificantlyHigherThanOverallMean"] = mean_scores.loc[mask, "CI_low"] > overall_ci_high
         mean_scores.loc[mask, "MeanSignificantlyLowerThanOverallMean"] = mean_scores.loc[mask, "CI_high"] < overall_ci_low
 
+        # Calculate mean difference
         mean_scores.loc[mask, "MeanDifferenceFromOverallMean"] = (
             (mean_scores.loc[mask, "Mean"] - overall_mean).abs()
         )
 
+        # Assign types
         mean_scores.loc[mask, "Type"] = np.where(
             mean_scores.loc[mask, "Drug"] == "Overall mean",
             "Overall mean", 
@@ -230,6 +266,7 @@ def calculate_significant_difference_from_overall(mean_scores: pd.DataFrame):
     
     return mean_scores
 #endregion
+
 
 #region Hannese asjad
 
