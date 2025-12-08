@@ -325,7 +325,6 @@ DRUG_TYPES = [
     "Semer",
     "VSA",
 ]
-
 PERSONALITY_TRAITS = [
 	"Nscore",
 	"Ascore",
@@ -335,6 +334,8 @@ PERSONALITY_TRAITS = [
 	"Impulsive",
 	"SS",
 ]
+
+
 def read_data(filepath: str):
     """
     Reads and cleans data from the specified path
