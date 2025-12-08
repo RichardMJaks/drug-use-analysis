@@ -186,7 +186,6 @@ human_readable_data = human_readable_data[~human_readable_data["Education"].isin
 data = data[~data["Education"].isin([-2.43591, -1.43719])] # Numeric values for left school before 16 and at 17 values
 del data_reading.EDUCATION[-2.43591]
 del data_reading.EDUCATION[-1.43719]
-print(data_reading.EDUCATION)
 
 # %% [markdown]
 # ## Drug Usage Visualization
@@ -234,6 +233,7 @@ df["Percent"] = df["Amount"] / df["Total"] * 100
 df = df[df["Percent"] >= 1].copy()
 
 # %%
+df["Usage"] = pd.Categorical(df["Usage"], categories=data_reading.DRUG_CLASSIFIER.values(), ordered=True)
 (
     pn.ggplot(df, pn.aes("Drug", "Percent", fill="Usage"))
     + pn.geom_col(position=pn.position_dodge(width=0.8), width=0.7)
@@ -298,17 +298,20 @@ data_analysis.plot_all_traits_country(data2)
 # The differences don't seem to be significant enough to take into account.
 
 # %% [markdown]
-# Lets also see, if there is any significant difference between education levels in the two countries.
+# ## Education & Drug Usage in USA and UK
+
+# %% [markdown]
+# Lets first see, if there are significant differences between education in the USA and the UK.
 
 # %%
 data_analysis.plot_edu_levels_country(data2)
 
 
 # %% [markdown]
-# Here we can see that there is a significant difference between educational distribution between the two countries
+# Here we can see that there is a significant difference between educational distribution between the two countries. This should be accounted for when interpreting future results, that USA will skew education-related statistics, especially in college dropout area. It can be attributed to higher study and student costs in the USA, and the resulting high dropout rate. They also incur higher student debts, which can also drive them to use more drugs. So far, this is just speculation, but needs to be accounted for.
 
 # %% [markdown]
-# Drug users per education level
+# For next, lets visualize the usage of different drugs over different education levels.
 
 # %%
 drug_per_education = data_analysis.get_all_drug_usage_by_trait(human_readable_data, "Education")
@@ -334,51 +337,13 @@ drug_per_education_total
 )
 
 # %% [markdown]
-# Taking into account the previously visualized amount of respondents per education level, the lower number of users in lower education categories makes sense. Thus, those need to be visualized proportionally to respondents per education level.
+# Taking into account the previously visualized amount of respondents per education level, the lower absolute number of users in lower education categories makes sense. Thus, those need to be visualized proportionally to respondents per education level. We will also drop ex-users (users, who haven't use the respective drugs for over a month) from the visualization, due to them mostly just cluttering it and making the visualization harder to read.
 
 # %%
-#total_drug_users_per_education = drug_per_education.copy()
-#total_drug_users_per_education = total_drug_users_per_education.drop("Classifier", axis=1)
-#total_drug_users_per_education = total_drug_users_per_education.groupby(["Education", "Drug"], observed=True).sum().reset_index()
-#total_drug_users_per_education
-
 drug_per_education["Relative"] = drug_per_education["Users"] / drug_per_education.groupby(["Education", "Drug"], observed=True).transform("sum")["Users"]
-drug_per_education
-#drug_per_education.groupby(["Education", "Drug"], observed=True).transform("sum")["Users"]
 
 # %%
-(
-    pn.ggplot(drug_per_education, pn.aes("Education", "Relative", fill="Classifier")) 
-    + pn.geom_col(position="dodge")
-    + pn.facet_wrap("Drug")
-    + pn.theme(
-        figure_size=(12, 12),
-        axis_text_x=pn.element_text(rotation=90, hjust=1),
-        axis_text_y=pn.element_blank(),
-    )
-)
-
-# %% [markdown]
-# Exclude non-users for clarity
-
-# %%
-drug_per_education = drug_per_education[drug_per_education["Classifier"] != "Never Used"]
-(
-    pn.ggplot(drug_per_education, pn.aes("Education", "Relative", fill="Classifier")) 
-    + pn.geom_col(position="dodge")
-    + pn.facet_wrap("Drug")
-    + pn.theme(
-        figure_size=(12, 12),
-        axis_text_x=pn.element_text(rotation=90, hjust=1),
-        axis_text_y=pn.element_blank(),
-    )
-)
-
-# %% [markdown]
-# For even more clarity, lets exclude the ones who haven't used the drug within the last year, to get the active users
-
-# %%
-drug_per_education = drug_per_education[~drug_per_education["Classifier"].isin(["Used in Last Year", "Used over a Decade Ago", "Used in Last Decade"])]
+drug_per_education = drug_per_education[~drug_per_education["Classifier"].isin(["Never Used", "Used in Last Year", "Used over a Decade Ago", "Used in Last Decade"])]
 drug_per_education["Classifier"] = pd.Categorical(
         drug_per_education["Classifier"],
         categories=list(data_reading.DRUG_CLASSIFIER.values()),
@@ -396,7 +361,13 @@ drug_per_education["Classifier"] = pd.Categorical(
 )
 
 # %% [markdown]
-# Samamoodi ka soo põhiselt
+# As expected, **dropping out at college level increases drug usage rates** across the board. Similarly expected result is when dropping out at 18 years old. We expected that dropping out at younger ages would also increase the rates, but those seem to be consistent with gaining higher education.
+
+# %% [markdown]
+# ## Drug Usage Rates by Other Metrics
+
+# %% [markdown]
+# ### Drug Usage Rates by Gender
 
 # %%
 drug_per_gender = data_analysis.get_all_drug_usage_by_trait(human_readable_data, "Gender")
@@ -412,7 +383,6 @@ drug_per_gender["Classifier"] = pd.Categorical(
         categories=list(data_reading.DRUG_CLASSIFIER.values()),
         ordered=True,
     )
-drug_per_gender
 
 # %%
 (
@@ -427,7 +397,10 @@ drug_per_gender
 )
 
 # %% [markdown]
-# Drug usage per age
+# These also seem to be in expected ranges based on other stides. Men tend to use more drugs than women, while legal drugs (Alcohol, Chocolate, Caffeine) seem to be about the same for both genders.
+
+# %% [markdown]
+# ### Drug Usage by Age
 
 # %%
 drug_per_age = data_analysis.get_all_drug_usage_by_trait(human_readable_data, "Age")
@@ -443,7 +416,6 @@ drug_per_age["Classifier"] = pd.Categorical(
         categories=list(data_reading.DRUG_CLASSIFIER.values()),
         ordered=True,
     )
-drug_per_age
 
 # %%
 (
@@ -458,7 +430,13 @@ drug_per_age
 )
 
 # %% [markdown]
-# Get mean personality scores for each drug, and confidence indicators
+# Also similarly expected, most of the drugs are used more by younger people, 34 and under. Similarly expected is that most people who use highly addictive drugs have used them within the last day.
+
+# %% [markdown]
+# ## Drugs and Their Impact on Personality
+
+# %% [markdown]
+# Next lets see, if any of the drugs have a significant impact on the personality of their users. For that we will calculate the mean values per each drug for each measured personality trait, and then plot them on a graph. We will also calculate, if their difference is large enough to be considered statistically significant for the impact on their user's personality.
 
 # %%
 personality_drugs = human_readable_data[data_reading.DRUG_TYPES + data_reading.PERSONALITY_TRAITS]
@@ -468,123 +446,29 @@ melted_drugs = personality_drugs.melt(
     var_name="Trait",
     value_name="Score",
 )
-def get_personality_drug_melt(data: pd.DataFrame):
-    grouped_usage = pd.DataFrame(columns=["Drug", "Trait", "Classifier", "Score"])
-    for drug_type in data_reading.DRUG_TYPES:
-        single_drug_grouping = data[["Trait", drug_type, "Score"]]
-        single_drug_grouping = single_drug_grouping.rename(columns={drug_type: "Classifier"})
-        single_drug_grouping["Drug"] = drug_type
-        #print(single_drug_grouping)
 
-        grouped_usage = pd.concat(
-            (grouped_usage, single_drug_grouping)
-        )
 
-    return grouped_usage
-
-melted_drugs = get_personality_drug_melt(melted_drugs)
+melted_drugs = data_analysis.get_personality_drug_melt(melted_drugs)
 
 # Exclude non-users of the drugs for calculations
-mean_scores = melted_drugs[melted_drugs["Classifier"] != "Never Used"]
-mean_scores["Classifier"] = "" # Will later be overwritten to compare to overall mean
+mean_scores = data_analysis.calculate_mean_personality_scores_per_drug(melted_drugs[melted_drugs["Classifier"] != "Never Used"])
 
-
-agg = (
-        mean_scores.drop(columns=["Classifier"]).groupby(["Drug", "Trait"], as_index=False)
-        .agg(
-            Mean=("Score", "mean"),
-            SD=("Score", "std"),
-            N=("Score", "size"),
-        )
-    )
-
-
-# standard error
-agg["SE"] = agg["SD"] / np.sqrt(agg["N"])
-
-# 95% CI using normal approximation (z = 1.96)
-z = 1.96
-agg["CI_low"] = agg["Mean"] - z * agg["SE"]
-agg["CI_high"] = agg["Mean"] + z * agg["SE"]
-
-mean_scores = mean_scores.groupby(["Drug", "Trait", "Classifier"]).mean().reset_index()
-
-mean_scores = mean_scores.merge(
-    agg,
-    on=["Drug", "Trait"]
-)
-
-# Rename stuff for ease of understanding
-mean_scores = mean_scores.rename(columns={"Classifier": "Type"})
-
-mean_scores
 
 # %% [markdown]
-# Get overall mean values and confidence indicators from all respondents
+# Lets add in overall mean values for each personality trait into the DataFrame.
 
 # %%
 # Insert overall means for each trait
-for trait in data_reading.PERSONALITY_TRAITS:
-    trait_overall_mean = melted_drugs[melted_drugs["Trait"] == trait]["Score"].mean()
-    overall_agg = melted_drugs[melted_drugs["Trait"] == trait]["Score"].agg(
-            Mean="mean",
-            SD="std",
-            N="size",
-        )
-    
-    # standard error
-    overall_agg["SE"] = overall_agg["SD"] / np.sqrt(overall_agg["N"])
-
-    # 95% CI using normal approximation (z = 1.96)
-    z = 1.96
-    overall_agg["CI_low"] = overall_agg["Mean"] - z * overall_agg["SE"]
-    overall_agg["CI_high"] = overall_agg["Mean"] + z * overall_agg["SE"]
-    mean_scores.loc[-1] = [
-        "Overall mean", trait, "Overall mean", trait_overall_mean, 
-        overall_agg["Mean"],
-        overall_agg["SD"],
-        overall_agg["N"],
-        overall_agg["SE"],
-        overall_agg["CI_low"],
-        overall_agg["CI_high"],
-    ]
-    mean_scores.index = mean_scores.index + 1
-    mean_scores = mean_scores.sort_index()
-
-mean_scores
+mean_scores = data_analysis.calculate_overall_personality_means(melted_drugs, mean_scores)
 
 # %% [markdown]
-# Get significant differences from overall mean
+# Check, if any CI scores and mean differences are to be considered significant enough to be categorized as such.
 
 # %%
-for trait in data_reading.PERSONALITY_TRAITS:
-    mask = mean_scores["Trait"] == trait
-    overall = mean_scores[(mean_scores.loc[mask, "Drug"] == "Overall mean") & mask]
-    overall_mean = overall["Mean"].iloc[0]
-    if trait == "Escore":
-        print(overall_mean)
-    overall_ci_high = overall["CI_high"].iloc[0]
-    overall_ci_low = overall["CI_low"].iloc[0]
+mean_scores = data_analysis.calculate_significant_difference_from_overall(mean_scores)
 
-    mean_scores.loc[mask, "MeanSignificantlyHigherThanOverallMean"] = mean_scores.loc[mask, "CI_low"] > overall_ci_high
-    mean_scores.loc[mask, "MeanSignificantlyLowerThanOverallMean"] = mean_scores.loc[mask, "CI_high"] < overall_ci_low
-
-    mean_scores.loc[mask, "MeanDifferenceFromOverallMean"] = (
-        (mean_scores.loc[mask, "Mean"] - overall_mean).abs()
-    )
-
-    mean_scores.loc[mask, "Type"] = np.where(
-        mean_scores.loc[mask, "Drug"] == "Overall mean",
-        "Overall mean", 
-        np.where(
-            mean_scores.loc[mask, "MeanSignificantlyLowerThanOverallMean"] | mean_scores.loc[mask, "MeanSignificantlyHigherThanOverallMean"],
-            "Significant Difference",
-            "Within Bounds"
-        )
-    )
-    
-
-mean_scores[mean_scores["Trait"] == "Escore"]
+# %% [markdown]
+# Visualize the calculations
 
 # %%
 ascores = mean_scores[mean_scores["Trait"] == "Ascore"]
@@ -625,23 +509,50 @@ def pn_config(data, trait, ylim=(37,43.5)):
 # %%
 pn_config(escores, "Extraversion")
 
+# %% [markdown]
+# Here we can confidently say, that extraversion doesn't get impacted too much by given drugs based on this dataset. We see that **Heroin, Meth, VSA and Benzos** are barely outside of the overall mean, with large errors. Based on current observations, we could say it is significant enough, but low confidence indicators also show, that it might not be the case.
+
 # %%
 pn_config(ascores, "Agreeableness")
+
+# %% [markdown]
+# We can easily observe here, that **Agreeableness is heavily impacted by drugs**. Most drugs reduce it, and harder drugs, especially **Heroin, Methamphetamines, and Cocaine** reduce agreeableness by a lot.
 
 # %%
 pn_config(cscores, "Conscientiousness")
 
+# %% [markdown]
+# What goes for Agreeableness, goes doubly for Conscientiousness. **Conscientiousness** is very heavily impacted by various drugs, making the users less structured and less organized overall.
+
 # %%
 pn_config(nscores, "Neuroticism", (30, 45))
+
+# %% [markdown]
+# **Neuroticism** isn't as heavily impacted as some other traits, but it is nonetheless clearly visible, that drug-users become more neurotic, and thus less emotionally stable than non-users. 
 
 # %%
 pn_config(oscores, "Openness", (40, 50))
 
+# %% [markdown]
+# Also, as expected, **drug-users have higher Openness scores** than regular users. They tend to see and imagine things due to doing drugs. They also tend to be more open and sociable.
+
 # %%
 pn_config(impulsive, "Impulsiveness", (0, 10))
 
+# %% [markdown]
+# Another change we could expect was **drug-users becoming more impulsive**. They tend to do more rash decisions, and think less in the bigger picture.
+
 # %%
-pn_config(ss, "Sensation", (0, 10))
+pn_config(ss, "Sensation (as measured by ImpSS)", (0, 10))
+
+# %% [markdown]
+# **Drug users also tend to become more sensory**, receiving more information through their senses than non-users. 
+
+# %% [markdown]
+# ## Drugs and Their Co-Usage
+
+# %% [markdown]
+# For the last thing, lets see if we manage to cluster some drugs, which tend to be commonly used together. 
 
 # %%
 recent = ["Used in Last Day", "Used in Last Week", "Used in Last Month"]
@@ -654,8 +565,8 @@ df_recent = human_readable_data[data_reading.DRUG_TYPES].apply(
 # %%
 pair_counts = []
 
-for d1 in DRUG_TYPES:
-    for d2 in DRUG_TYPES:
+for d1 in data_reading.DRUG_TYPES:
+    for d2 in data_reading.DRUG_TYPES:
         if d1 >= d2:        # skip duplicates + skip same drug
             continue
         count = (df_recent[d1] & df_recent[d2]).sum()
@@ -679,8 +590,6 @@ for _, row in pair_counts.iterrows():
 # Each row = one drug, features = co-usage with other drugs
 X = matrix.values
 
-matrix
-
 # %%
 # ---- 3) KMeans clustering ----
 # choose number of clusters (e.g. 2 or 3)
@@ -693,6 +602,9 @@ cluster_df = pd.DataFrame({
     "Cluster": clusters
 })
 cluster_df.sort_values("Cluster", ascending=True)
+
+# %% [markdown]
+# Opposite to what we expected, clustering shows, that **Alcohol, Nicotine, Chocolate, Cannabis and Caffeine**, 4 most used drugs in this dataset, aren't related to each other at all. It does cluster other drugs together into a few large groups, generally classifying as **Social Drugs** and **Hard Drugs**.
 
 # %%
 import matplotlib.pyplot as plt
@@ -708,3 +620,10 @@ ax = sns.heatmap(
 plt.title("Drug co-usage heatmap")
 plt.tight_layout()
 plt.show()
+
+# %% [markdown]
+# Heatmap show that most common drugs used together are **Caffeine, Chocolate, Cannabis, Alcohol and Nicotine**. They are most commonly used together with other drugs, but other than that it is hard to read out from the heatmap, if there are any other common drugs used together.
+#
+# One of the drugs which is commonly used with other drugs is Amphetamines, which is commonly used together with **Legal highs, Methamphetamines and Ecstasy**.
+#
+# **Ecstasy users** also commonly use other party drugs, like **LSD, Legal highs, Coke and Amphetamines**.
