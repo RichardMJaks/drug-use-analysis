@@ -14,13 +14,13 @@
 # ---
 
 # %% [markdown]
-# Exploring the Link Between Personality Traits and Substance Use
+# # Exploring the Link Between Personality Traits and Substance Use
 
 # %% [markdown]
 # Dataset: https://www.kaggle.com/datasets/mexwell/drug-consumption-classification/data
 
 # %% [markdown]
-# Importing both necessary and custom modules
+# First, lets import necessary modules
 
 # %%
 import sys
@@ -34,14 +34,16 @@ import matplotlib.pyplot as plt
 from scipy import stats
 
 # %% [markdown]
-# Read in the data
+# ## Data reading & cleaning
+
+# %% [markdown]
+# First, lets read in the data.
 
 # %%
 data = data_reading.read_data("data/drug_consumption.csv")
-dataOG = data.copy()
+dataOG = data.copy() # In case we need to work on the completely original raw data later
 human_readable_data = data_reading.convert_data(data)
 human_readable_data = data_reading.convert_drug_usage_classifiers(human_readable_data)
-print(list(data_reading.EDUCATION.values()))
 human_readable_data["Education"] = pd.Categorical(
         human_readable_data["Education"],
         categories=list(data_reading.EDUCATION.values()),
@@ -50,7 +52,10 @@ human_readable_data["Education"] = pd.Categorical(
 human_readable_data
 
 # %% [markdown]
-# Make a DataFrame useful for categorizing drugs
+# ### Start with initial visualizations
+
+# %% [markdown]
+# Let's create the initial DataFrame and visualization to see how many users of each drug in each category there are.
 
 # %%
 # Bring data to a shape possible to be shown as a plot
@@ -71,6 +76,12 @@ drug_usage
     + pn.theme(figure_size=(12, 6))
 )
 
+# %% [markdown]
+# Here we can already see a few oddities. Namely **Semer** having weird usage rates. When reading from Kaggle we see, that we should exclude all who claimed to use Semer, as it was there just to filter out over-claimers.
+
+# %% [markdown]
+# Lets also see how many users each drug has.
+
 # %%
 drug_users = drug_usage[drug_usage["Usage"] != "CL0"]
 drug_users = drug_users.groupby(["Drug"], as_index=False)["Amount"].sum()
@@ -82,6 +93,9 @@ drug_users = drug_users.assign(
 )
 
 drug_users
+
+# %% [markdown]
+# We again notice extremely low usage
 
 # %%
 (
@@ -1646,3 +1660,54 @@ pn_config(impulsive, "Impulsiveness", (0, 10))
 
 # %%
 pn_config(ss, "Sensation", (0, 10))
+
+# %%
+recent = ["Used in Last Day", "Used in Last Week", "Used in Last Month"]
+
+# %%
+df_recent = human_readable_data[data_reading.DRUG_TYPES].apply(
+    lambda col: col.isin(recent)
+)
+
+# %%
+pair_counts = []
+
+for d1 in DRUG_TYPES:
+    for d2 in DRUG_TYPES:
+        if d1 >= d2:        # skip duplicates + skip same drug
+            continue
+        count = (df_recent[d1] & df_recent[d2]).sum()
+        pair_counts.append((d1, d2, count))
+pair_counts = pd.DataFrame(pair_counts, columns=["Drug1", "Drug2", "Count"])
+
+# %%
+from sklearn.cluster import KMeans
+
+
+# ---- 2) Build symmetric co-usage matrix (features for KMeans) ----
+drugs = sorted(set(pair_counts["Drug1"]) | set(pair_counts["Drug2"]))
+
+matrix = pd.DataFrame(0, index=drugs, columns=drugs)
+
+for _, row in pair_counts.iterrows():
+    d1, d2, c = row["Drug1"], row["Drug2"], row["Count"]
+    matrix.loc[d1, d2] = c
+    matrix.loc[d2, d1] = c  # symmetric
+
+# Each row = one drug, features = co-usage with other drugs
+X = matrix.values
+
+matrix
+
+# %%
+# ---- 3) KMeans clustering ----
+# choose number of clusters (e.g. 2 or 3)
+k = 10
+kmeans = KMeans(n_clusters=k, random_state=42, n_init="auto")
+clusters = kmeans.fit_predict(X)
+
+cluster_df = pd.DataFrame({
+    "Drug": drugs,
+    "Cluster": clusters
+})
+cluster_df.sort_values("Cluster", ascending=True)
