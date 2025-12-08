@@ -63,6 +63,7 @@ def describe_data(data: pd.DataFrame):
     
     print(SEPARATOR_STRING)
 
+
 def get_drug_usage_by_trait(data: pd.DataFrame, drug: str, trait: str):
     output_data = data[[trait, drug]]
     output_data = output_data.groupby([trait, drug]).size().reset_index(name="Amount")
@@ -119,6 +120,115 @@ def get_uk_and_us_cannabis_users(data: pd.DataFrame):
     )
 
     return users_amount_by_country
+
+
+def get_personality_drug_melt(data: pd.DataFrame):
+    grouped_usage = pd.DataFrame(columns=["Drug", "Trait", "Classifier", "Score"])
+    for drug_type in data_reading.DRUG_TYPES:
+        single_drug_grouping = data[["Trait", drug_type, "Score"]]
+        single_drug_grouping = single_drug_grouping.rename(columns={drug_type: "Classifier"})
+        single_drug_grouping["Drug"] = drug_type
+        #print(single_drug_grouping)
+
+        grouped_usage = pd.concat(
+            (grouped_usage, single_drug_grouping)
+        )
+
+    return grouped_usage
+
+
+def calculate_mean_personality_scores_per_drug(melted_data: pd.DataFrame):
+    mean_scores = melted_data
+    mean_scores["Classifier"] = "" # Will later be overwritten to compare to overall mean
+
+    agg = (
+            mean_scores.drop(columns=["Classifier"]).groupby(["Drug", "Trait"], as_index=False)
+            .agg(
+                Mean=("Score", "mean"),
+                SD=("Score", "std"),
+                N=("Score", "size"),
+            )
+        )
+
+    # standard error
+    agg["SE"] = agg["SD"] / np.sqrt(agg["N"])
+
+    # 95% CI using normal approximation (z = 1.96)
+    z = 1.96
+    agg["CI_low"] = agg["Mean"] - z * agg["SE"]
+    agg["CI_high"] = agg["Mean"] + z * agg["SE"]
+
+    mean_scores = mean_scores.groupby(["Drug", "Trait", "Classifier"]).mean().reset_index()
+
+    mean_scores = mean_scores.merge(
+        agg,
+        on=["Drug", "Trait"]
+    )
+
+    # Rename stuff for ease of understanding
+    mean_scores = mean_scores.rename(columns={"Classifier": "Type"})
+
+    return mean_scores
+
+
+def calculate_overall_personality_means(melted_data: pd.DataFrame, mean_scores: pd.DataFrame):
+    melted_drugs = melted_data
+    for trait in data_reading.PERSONALITY_TRAITS:
+        trait_overall_mean = melted_drugs[melted_drugs["Trait"] == trait]["Score"].mean()
+        overall_agg = melted_drugs[melted_drugs["Trait"] == trait]["Score"].agg(
+                Mean="mean",
+                SD="std",
+                N="size",
+            )
+        
+        # standard error
+        overall_agg["SE"] = overall_agg["SD"] / np.sqrt(overall_agg["N"])
+
+        # 95% CI using normal approximation (z = 1.96)
+        z = 1.96
+        overall_agg["CI_low"] = overall_agg["Mean"] - z * overall_agg["SE"]
+        overall_agg["CI_high"] = overall_agg["Mean"] + z * overall_agg["SE"]
+        mean_scores.loc[-1] = [
+            "Overall mean", trait, "Overall mean", trait_overall_mean, 
+            overall_agg["Mean"],
+            overall_agg["SD"],
+            overall_agg["N"],
+            overall_agg["SE"],
+            overall_agg["CI_low"],
+            overall_agg["CI_high"],
+        ]
+        mean_scores.index = mean_scores.index + 1
+        mean_scores = mean_scores.sort_index()
+    
+    return mean_scores
+
+
+def calculate_significant_difference_from_overall(mean_scores: pd.DataFrame):
+    for trait in data_reading.PERSONALITY_TRAITS:
+        mask = mean_scores["Trait"] == trait
+        overall = mean_scores[(mean_scores.loc[mask, "Drug"] == "Overall mean") & mask]
+        overall_mean = overall["Mean"].iloc[0]
+        overall_ci_high = overall["CI_high"].iloc[0]
+        overall_ci_low = overall["CI_low"].iloc[0]
+
+        mean_scores.loc[mask, "MeanSignificantlyHigherThanOverallMean"] = mean_scores.loc[mask, "CI_low"] > overall_ci_high
+        mean_scores.loc[mask, "MeanSignificantlyLowerThanOverallMean"] = mean_scores.loc[mask, "CI_high"] < overall_ci_low
+
+        mean_scores.loc[mask, "MeanDifferenceFromOverallMean"] = (
+            (mean_scores.loc[mask, "Mean"] - overall_mean).abs()
+        )
+
+        mean_scores.loc[mask, "Type"] = np.where(
+            mean_scores.loc[mask, "Drug"] == "Overall mean",
+            "Overall mean", 
+            np.where(
+                mean_scores.loc[mask, "MeanSignificantlyLowerThanOverallMean"] | mean_scores.loc[mask, "MeanSignificantlyHigherThanOverallMean"],
+                "Significant Difference",
+                "Within Bounds"
+            )
+        )
+    
+    return mean_scores
 #endregion
 
 #region Hannese asjad
